@@ -1,6 +1,3 @@
-
-
-
 let a = Lazy.force(RomLoader.load)
 
 Js.log(a->RomLoader.toBuffer)
