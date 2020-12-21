@@ -33,26 +33,133 @@ type t = {
   halted: bool,
 }
 
-let getEmpty = (): t => {
-  {
-    memory: Js_typed_array.Uint8Array.fromLength(4096),
-    v: Js_typed_array.Uint8Array.fromLength(16),
-    i: 0,
-    dt: 0,
-    st: 0,
-    pc: 200,
-    sp: 0,
-    stack: Js_typed_array.Uint16Array.fromLength(16),
-    ui: Belt.Array.make(32, Belt.Array.make(64, 0)),
-    key: -1,
-    halted: false,
+type variables = KK(int) | N(int) | NNN(int) | X(int) | Y(int)
+
+let getVariable = opcode =>
+  switch opcode {
+  | X(code) => code->Pervasives.land(0x0f00)->Pervasives.lsr(8)
+  | Y(code) => code->Pervasives.land(0x00f0)->Pervasives.lsr(4)
+  | NNN(code) => code->Pervasives.land(0xfff)
+  | KK(code) => code->Pervasives.land(0x00ff)
+  | N(code) => code->Pervasives.land(0x000f)
   }
+
+let getEmpty = {
+  memory: Js_typed_array.Uint8Array.fromLength(4096),
+  v: Js_typed_array.Uint8Array.fromLength(16),
+  i: 0,
+  dt: 0,
+  st: 0,
+  pc: memory_offset,
+  sp: 0,
+  stack: Js_typed_array.Uint16Array.fromLength(16),
+  ui: Belt.Array.make(32, Belt.Array.make(64, 0)),
+  key: -1,
+  halted: false,
 }
 
-let loadRom = (romBuffer): t => {
+type key = Number(int) | A | B | C | D | E | F
+
+let fontSet = Js_typed_array.Uint8Array.make([
+  0xF0,
+  0x90,
+  0x90,
+  0x90,
+  0xF0, // 0
+  0x20,
+  0x60,
+  0x20,
+  0x20,
+  0x70, // 1
+  0xF0,
+  0x10,
+  0xF0,
+  0x80,
+  0xF0, // 2
+  0xF0,
+  0x10,
+  0xF0,
+  0x10,
+  0xF0, // 3
+  0x90,
+  0x90,
+  0xF0,
+  0x10,
+  0x10, // 4
+  0xF0,
+  0x80,
+  0xF0,
+  0x10,
+  0xF0, // 5
+  0xF0,
+  0x80,
+  0xF0,
+  0x90,
+  0xF0, // 6
+  0xF0,
+  0x10,
+  0x20,
+  0x40,
+  0x40, // 7
+  0xF0,
+  0x90,
+  0xF0,
+  0x90,
+  0xF0, // 8
+  0xF0,
+  0x90,
+  0xF0,
+  0x10,
+  0xF0, // 9
+  0xF0,
+  0x90,
+  0xF0,
+  0x90,
+  0x90, // A
+  0xE0,
+  0x90,
+  0xE0,
+  0x90,
+  0xE0, // B
+  0xF0,
+  0x80,
+  0x80,
+  0x80,
+  0xF0, // C
+  0xE0,
+  0x90,
+  0x90,
+  0x90,
+  0xE0, // D
+  0xF0,
+  0x80,
+  0xF0,
+  0x80,
+  0xF0, // E
+  0xF0,
+  0x80,
+  0xF0,
+  0x80,
+  0x80, // F])
+])
+
+let loadFontSet = cpu => {
+  let {memory} = cpu
+  for i in 0 to Js_typed_array.Uint8Array.length(fontSet) {
+    Js_typed_array.Uint8Array.unsafe_set(
+      memory,
+      i,
+      Js_typed_array.Uint8Array.unsafe_get(fontSet, i),
+    )
+  }
+  {...cpu, memory: memory}
+}
+
+// We will have a CPU with rom data fully stored
+let loadRom = romBuffer => {
   switch romBuffer {
   | Some(rom) => {
-      let {memory} = getEmpty()
+      let {memory} = getEmpty
       for i in 0 to Js.Array.length(rom) - 1 {
         Js_typed_array.Uint8Array.unsafe_set(
           memory,
@@ -62,14 +169,33 @@ let loadRom = (romBuffer): t => {
       }
 
       {
-        ...getEmpty(),
+        ...getEmpty,
         memory: memory,
       }
     }
-  | None => getEmpty()
+  | None => getEmpty
   }
 }
 
-let fetch = () => "impl"
-let decode = () => "impl"
-let execute = () => "impl"
+// Read memory address from PC and PC +1 counter
+// Update PC to PC + 2
+// Return Opcode
+let fetch = cpu => {
+  let {pc, memory} = cpu
+  let codes = [
+    Js_typed_array.Uint8Array.unsafe_get(memory, pc),
+    Js_typed_array.Uint8Array.unsafe_get(memory, pc + 1),
+  ]
+  ({...cpu, pc: pc + 2}, Pervasives.lsl(codes[0], 8) + codes[1])
+}
+let decode = (cpu, opcode) => (cpu, opcode)
+// // let a = Instruction.find(opcode)
+// Js.log(a)
+// (cpu, a)
+
+// let execute = (cpu, instructions) => instructions(cpu)
+
+let setV = (cpu, value) => {
+  Js.log(value)
+  cpu
+}

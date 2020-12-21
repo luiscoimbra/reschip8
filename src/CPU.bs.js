@@ -5,65 +5,216 @@ var Belt_Array = require("bs-platform/lib/js/belt_Array.js");
 var Caml_array = require("bs-platform/lib/js/caml_array.js");
 var Caml_format = require("bs-platform/lib/js/caml_format.js");
 
-function getEmpty(param) {
+function getVariable(opcode) {
+  switch (opcode.TAG | 0) {
+    case /* KK */0 :
+        return opcode._0 & 255;
+    case /* N */1 :
+        return opcode._0 & 15;
+    case /* NNN */2 :
+        return opcode._0 & 4095;
+    case /* X */3 :
+        return ((opcode._0 & 3840) >>> 8);
+    case /* Y */4 :
+        return ((opcode._0 & 240) >>> 4);
+    
+  }
+}
+
+var getEmpty_memory = new Uint8Array(4096);
+
+var getEmpty_v = new Uint8Array(16);
+
+var getEmpty_stack = new Uint16Array(16);
+
+var getEmpty_ui = Belt_Array.make(32, Belt_Array.make(64, 0));
+
+var getEmpty = {
+  memory: getEmpty_memory,
+  v: getEmpty_v,
+  i: 0,
+  dt: 0,
+  st: 0,
+  pc: 512,
+  sp: 0,
+  stack: getEmpty_stack,
+  ui: getEmpty_ui,
+  key: -1,
+  halted: false
+};
+
+var fontSet = new Uint8Array([
+      240,
+      144,
+      144,
+      144,
+      240,
+      32,
+      96,
+      32,
+      32,
+      112,
+      240,
+      16,
+      240,
+      128,
+      240,
+      240,
+      16,
+      240,
+      16,
+      240,
+      144,
+      144,
+      240,
+      16,
+      16,
+      240,
+      128,
+      240,
+      16,
+      240,
+      240,
+      128,
+      240,
+      144,
+      240,
+      240,
+      16,
+      32,
+      64,
+      64,
+      240,
+      144,
+      240,
+      144,
+      240,
+      240,
+      144,
+      240,
+      16,
+      240,
+      240,
+      144,
+      240,
+      144,
+      144,
+      224,
+      144,
+      224,
+      144,
+      224,
+      240,
+      128,
+      128,
+      128,
+      240,
+      224,
+      144,
+      144,
+      144,
+      224,
+      240,
+      128,
+      240,
+      128,
+      240,
+      240,
+      128,
+      240,
+      128,
+      128
+    ]);
+
+function loadFontSet(cpu) {
+  var memory = cpu.memory;
+  for(var i = 0 ,i_finish = fontSet.length; i <= i_finish; ++i){
+    memory[i] = fontSet[i];
+  }
   return {
-          memory: new Uint8Array(4096),
-          v: new Uint8Array(16),
-          i: 0,
-          dt: 0,
-          st: 0,
-          pc: 200,
-          sp: 0,
-          stack: new Uint16Array(16),
-          ui: Belt_Array.make(32, Belt_Array.make(64, 0)),
-          key: -1,
-          halted: false
+          memory: memory,
+          v: cpu.v,
+          i: cpu.i,
+          dt: cpu.dt,
+          st: cpu.st,
+          pc: cpu.pc,
+          sp: cpu.sp,
+          stack: cpu.stack,
+          ui: cpu.ui,
+          key: cpu.key,
+          halted: cpu.halted
         };
 }
 
 function loadRom(romBuffer) {
   if (romBuffer === undefined) {
-    return getEmpty(undefined);
+    return getEmpty;
   }
-  var match = getEmpty(undefined);
-  var memory = match.memory;
+  var memory = getEmpty_memory;
   for(var i = 0 ,i_finish = romBuffer.length; i < i_finish; ++i){
     memory[512 + i | 0] = Caml_format.caml_int_of_string("0x" + Caml_array.get(romBuffer, i));
   }
-  var init = getEmpty(undefined);
   return {
           memory: memory,
-          v: init.v,
-          i: init.i,
-          dt: init.dt,
-          st: init.st,
-          pc: init.pc,
-          sp: init.sp,
-          stack: init.stack,
-          ui: init.ui,
-          key: init.key,
-          halted: init.halted
+          v: getEmpty_v,
+          i: 0,
+          dt: 0,
+          st: 0,
+          pc: 512,
+          sp: 0,
+          stack: getEmpty_stack,
+          ui: getEmpty_ui,
+          key: -1,
+          halted: false
         };
 }
 
-function $$fetch(param) {
-  return "impl";
+function $$fetch(cpu) {
+  var pc = cpu.pc;
+  var memory = cpu.memory;
+  var codes = [
+    memory[pc],
+    memory[pc + 1 | 0]
+  ];
+  return [
+          {
+            memory: cpu.memory,
+            v: cpu.v,
+            i: cpu.i,
+            dt: cpu.dt,
+            st: cpu.st,
+            pc: pc + 2 | 0,
+            sp: cpu.sp,
+            stack: cpu.stack,
+            ui: cpu.ui,
+            key: cpu.key,
+            halted: cpu.halted
+          },
+          (Caml_array.get(codes, 0) << 8) + Caml_array.get(codes, 1) | 0
+        ];
 }
 
-function decode(param) {
-  return "impl";
+function decode(cpu, opcode) {
+  return [
+          cpu,
+          opcode
+        ];
 }
 
-function execute(param) {
-  return "impl";
+function setV(cpu, value) {
+  console.log(value);
+  return cpu;
 }
 
 var memory_offset = 512;
 
 exports.memory_offset = memory_offset;
+exports.getVariable = getVariable;
 exports.getEmpty = getEmpty;
+exports.fontSet = fontSet;
+exports.loadFontSet = loadFontSet;
 exports.loadRom = loadRom;
 exports.$$fetch = $$fetch;
 exports.decode = decode;
-exports.execute = execute;
-/* No side effect */
+exports.setV = setV;
+/* getEmpty Not a pure module */
