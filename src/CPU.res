@@ -1,4 +1,5 @@
 open Js_typed_array
+
 type address = int
 
 type uiMap = array<array<int>>
@@ -235,11 +236,68 @@ let execute = (cpu, (opcode, instruction)) =>
       Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, _and)
       cpu
     }
-
-  | _ => raise(Not_found)
+  | XOR_Vx_Vy => {
+      let _xor = lxor(
+        Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable),
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable),
+      )
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, _xor)
+      cpu
+    }
+  | ADD_Vx_Vy => {
+      let (x, y) = (
+        Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable),
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable),
+      )
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, x + y)
+      Uint8Array.unsafe_set(cpu.v, 0xf, x + y > 0xff ? 1 : 0)
+      cpu
+    }
+  | SUB_Vx_Vy => {
+      let (x, y) = (
+        Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable),
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable),
+      )
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, x - y)
+      Uint8Array.unsafe_set(cpu.v, 0xf, x > y ? 1 : 0)
+      cpu
+    }
+  | SHR_Vx_Vy => {
+      let x = Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, lsr(x, 1))
+      Uint8Array.unsafe_set(cpu.v, 0xf, land(x, 1) === 1 ? 1 : 0)
+      cpu
+    }
+  | SUBN_Vx_Vy => {
+      let (x, y) = (
+        Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable),
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable),
+      )
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, y - x)
+      Uint8Array.unsafe_set(cpu.v, 0xf, y > x ? 1 : 0)
+      cpu
+    }
+  | SHL_Vx => {
+      let x = Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, lsl(x, 1))
+      Uint8Array.unsafe_set(cpu.v, 0xf, lsr(x, 7))
+      cpu
+    }
+  | SNE_Vx_Vy => {
+      ...cpu,
+      pc: Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable) !==
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable)
+        ? cpu.pc + 2
+        : cpu.pc,
+    }
+  | LD_I_addr => {...cpu, i: opcode->NNN->getVariable}
+  | JP_V0_addr => {...cpu, pc: opcode->NNN->getVariable + Uint8Array.unsafe_get(cpu.v, 0)}
+  | RND_Vx_byte =>
+    Uint8Array.unsafe_set(
+      cpu.v,
+      opcode->X->getVariable,
+      land(Js.Math.random_int(0, 0xff), opcode->KK->getVariable),
+    )
+    cpu
+  // | _ => raise(Not_found)
   }
-
-// let setV = (cpu, value) => {
-//   Js.log(value)
-//   cpu
-// }
