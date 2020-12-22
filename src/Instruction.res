@@ -1,5 +1,5 @@
 type t =
-  | SYS
+  // | SYS
   | CLS
   | RET
   | JP_addr
@@ -38,7 +38,7 @@ type t =
 type rec instruction = {pattern: int, mask: int, t: t}
 
 let instructionSet: array<instruction> = [
-  {t: SYS, pattern: 0x0000, mask: 0xf000},
+  // {t: SYS, pattern: 0x0000, mask: 0xf000},
   {t: CLS, pattern: 0x00e0, mask: 0xffff},
   {t: RET, pattern: 0x00ee, mask: 0xffff},
   {t: JP_addr, pattern: 0x1000, mask: 0xf000},
@@ -75,10 +75,8 @@ let instructionSet: array<instruction> = [
   {t: LD_Vx_I, pattern: 0xf065, mask: 0xf0ff},
 ]
 
-// commands: (cpu, opcode) => {
-//   Js_typed_array.Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, opcode->KK->getVariable)
-//   cpu
-// },
-
-let find = opcode =>
-  Js.Array.find(i => Pervasives.land(opcode, i.mask) === i.pattern, instructionSet)
+let get = opcode =>
+  switch Js.Array.find(i => Pervasives.land(opcode, i.mask) === i.pattern, instructionSet) {
+  | Some(i) => (opcode, i.t)
+  | None => raise(Not_found)
+  }

@@ -4,6 +4,7 @@
 var Belt_Array = require("bs-platform/lib/js/belt_Array.js");
 var Caml_array = require("bs-platform/lib/js/caml_array.js");
 var Caml_format = require("bs-platform/lib/js/caml_format.js");
+var Instruction = require("./Instruction.bs.js");
 
 function getVariable(opcode) {
   switch (opcode.TAG | 0) {
@@ -194,16 +195,233 @@ function $$fetch(cpu) {
         ];
 }
 
-function decode(cpu, opcode) {
-  return [
-          cpu,
-          opcode
-        ];
-}
+var decode = Instruction.get;
 
-function setV(cpu, value) {
-  console.log(value);
-  return cpu;
+function execute(cpu, param) {
+  var opcode = param[0];
+  switch (param[1]) {
+    case /* CLS */0 :
+        return {
+                memory: cpu.memory,
+                v: cpu.v,
+                i: cpu.i,
+                dt: cpu.dt,
+                st: cpu.st,
+                pc: cpu.pc,
+                sp: cpu.sp,
+                stack: cpu.stack,
+                ui: Belt_Array.make(32, Belt_Array.make(64, 0)),
+                key: cpu.key,
+                halted: cpu.halted
+              };
+    case /* RET */1 :
+        return {
+                memory: cpu.memory,
+                v: cpu.v,
+                i: cpu.i,
+                dt: cpu.dt,
+                st: cpu.st,
+                pc: cpu.stack[cpu.sp],
+                sp: cpu.sp - 1 | 0,
+                stack: cpu.stack,
+                ui: cpu.ui,
+                key: cpu.key,
+                halted: cpu.halted
+              };
+    case /* JP_addr */2 :
+        return {
+                memory: cpu.memory,
+                v: cpu.v,
+                i: cpu.i,
+                dt: cpu.dt,
+                st: cpu.st,
+                pc: getVariable({
+                      TAG: /* NNN */2,
+                      _0: opcode
+                    }),
+                sp: cpu.sp,
+                stack: cpu.stack,
+                ui: cpu.ui,
+                key: cpu.key,
+                halted: cpu.halted
+              };
+    case /* CALL_addr */3 :
+        var sp = cpu.sp + 1 | 0;
+        cpu.stack[sp] = cpu.pc;
+        return {
+                memory: cpu.memory,
+                v: cpu.v,
+                i: cpu.i,
+                dt: cpu.dt,
+                st: cpu.st,
+                pc: getVariable({
+                      TAG: /* NNN */2,
+                      _0: opcode
+                    }),
+                sp: sp,
+                stack: cpu.stack,
+                ui: cpu.ui,
+                key: cpu.key,
+                halted: cpu.halted
+              };
+    case /* SE_Vx_byte */4 :
+        if (cpu.v[getVariable({
+                    TAG: /* X */3,
+                    _0: opcode
+                  })] === getVariable({
+                TAG: /* KK */0,
+                _0: opcode
+              })) {
+          return {
+                  memory: cpu.memory,
+                  v: cpu.v,
+                  i: cpu.i,
+                  dt: cpu.dt,
+                  st: cpu.st,
+                  pc: cpu.pc + 2 | 0,
+                  sp: cpu.sp,
+                  stack: cpu.stack,
+                  ui: cpu.ui,
+                  key: cpu.key,
+                  halted: cpu.halted
+                };
+        } else {
+          return cpu;
+        }
+    case /* SNE_Vx_byte */5 :
+        if (cpu.v[getVariable({
+                    TAG: /* X */3,
+                    _0: opcode
+                  })] !== getVariable({
+                TAG: /* KK */0,
+                _0: opcode
+              })) {
+          return {
+                  memory: cpu.memory,
+                  v: cpu.v,
+                  i: cpu.i,
+                  dt: cpu.dt,
+                  st: cpu.st,
+                  pc: cpu.pc + 2 | 0,
+                  sp: cpu.sp,
+                  stack: cpu.stack,
+                  ui: cpu.ui,
+                  key: cpu.key,
+                  halted: cpu.halted
+                };
+        } else {
+          return cpu;
+        }
+    case /* SE_Vx_Vy */6 :
+        if (cpu.v[getVariable({
+                    TAG: /* X */3,
+                    _0: opcode
+                  })] === cpu.v[getVariable({
+                    TAG: /* Y */4,
+                    _0: opcode
+                  })]) {
+          return {
+                  memory: cpu.memory,
+                  v: cpu.v,
+                  i: cpu.i,
+                  dt: cpu.dt,
+                  st: cpu.st,
+                  pc: cpu.pc + 2 | 0,
+                  sp: cpu.sp,
+                  stack: cpu.stack,
+                  ui: cpu.ui,
+                  key: cpu.key,
+                  halted: cpu.halted
+                };
+        } else {
+          return cpu;
+        }
+    case /* LD_Vx_byte */7 :
+        cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })] = getVariable({
+              TAG: /* KK */0,
+              _0: opcode
+            });
+        return cpu;
+    case /* ADD_Vx_byte */8 :
+        var vx = cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })];
+        cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })] = vx + getVariable({
+              TAG: /* KK */0,
+              _0: opcode
+            }) | 0;
+        return cpu;
+    case /* LD_Vx_Vy */9 :
+        var vy = cpu.v[getVariable({
+                  TAG: /* Y */4,
+                  _0: opcode
+                })];
+        cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })] = vy;
+        return cpu;
+    case /* OR_Vx_Vy */10 :
+        var _or = cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })] | cpu.v[getVariable({
+                  TAG: /* Y */4,
+                  _0: opcode
+                })];
+        cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })] = _or;
+        return cpu;
+    case /* AND_Vx_Vy */11 :
+        var _and = cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })] & cpu.v[getVariable({
+                  TAG: /* Y */4,
+                  _0: opcode
+                })];
+        cpu.v[getVariable({
+                  TAG: /* X */3,
+                  _0: opcode
+                })] = _and;
+        return cpu;
+    case /* XOR_Vx_Vy */12 :
+    case /* ADD_Vx_Vy */13 :
+    case /* SUB_Vx_Vy */14 :
+    case /* SHR_Vx_Vy */15 :
+    case /* SUBN_Vx_Vy */16 :
+    case /* SHL_Vx */17 :
+    case /* SNE_Vx_Vy */18 :
+    case /* LD_I_addr */19 :
+    case /* JP_V0_addr */20 :
+    case /* RND_Vx_byte */21 :
+    case /* DRW_Vx_Vy_n */22 :
+    case /* SKP_Vx */23 :
+    case /* SKNP_Vx */24 :
+    case /* LD_Vx_DT */25 :
+    case /* LD_Vx_K */26 :
+    case /* LD_DT_Vx */27 :
+    case /* LD_ST_Vx */28 :
+    case /* ADD_I_Vx */29 :
+    case /* LD_F_Vx */30 :
+    case /* LD_B_Vx */31 :
+    case /* LD_I_Vx */32 :
+    case /* LD_Vx_I */33 :
+        throw {
+              RE_EXN_ID: "Not_found",
+              Error: new Error()
+            };
+    
+  }
 }
 
 var memory_offset = 512;
@@ -216,5 +434,5 @@ exports.loadFontSet = loadFontSet;
 exports.loadRom = loadRom;
 exports.$$fetch = $$fetch;
 exports.decode = decode;
-exports.setV = setV;
+exports.execute = execute;
 /* getEmpty Not a pure module */

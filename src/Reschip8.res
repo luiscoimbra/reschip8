@@ -1,19 +1,20 @@
 let rom = Lazy.force(RomLoader.load)
 
-// Js.log(rom->RomLoader.toBuffer)
-
 let (cpu, code) = rom->RomLoader.toBuffer->CPU.loadRom->CPU.fetch
 
-Js.log(Instruction.find(0x6100))
+Js.log(code)
 
-let a = Instruction.find(0x6000)
+// let (opcode, instruction) = CPU.decode(0x6000)
 
-let b = switch a {
-| Some(v) =>
-  switch v.t {
-  | LD_Vx_byte => "is load vx"
-  }
-| None => "Instruction not found"
-}
+CPU.execute(cpu, CPU.decode(0x00ee))->Js.log
 
-b->Js.log
+// let b = switch a {
+// | Some(v) =>
+//   switch v.t {
+//   | LD_Vx_byte => "is load vx"
+//   | _ => "NOT IMPLEMENTED"
+//   }
+// | None => "Instruction not found"
+// }
+
+// b->Js.log

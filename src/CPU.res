@@ -1,6 +1,7 @@
+open Js_typed_array
 type address = int
 
-type uiMap = Js.Array.t<Js.Array.t<int>>
+type uiMap = array<array<int>>
 
 let memory_offset = 0x200
 
@@ -8,10 +9,10 @@ type t = {
   // Chip8 is capable of access up to 4kb of memory
   // Interpreter uses the first 512 bytes. from 0x000 to 0x1FF
   // The rest of the memory is reserved for the program data > 0x200
-  memory: Js_typed_array.Uint8Array.t,
+  memory: Uint8Array.t,
   // REGISTERS
   // 16 General Purpose 8-bit (Vx) from V0 to VF
-  v: Js_typed_array.Uint8Array.t,
+  v: Uint8Array.t,
   // Index addressess 16-bit from 0000 to FFFF
   i: address,
   // Timers (when non-zero, it shoud automatically decrement at a rate of 60hz)
@@ -24,7 +25,7 @@ type t = {
   // Stack Pointer 8-bit - point to the topmost level of the stack
   sp: int,
   // Stack of returning addressess from subroutines
-  stack: Js_typed_array.Uint16Array.t,
+  stack: Uint16Array.t,
   // EXTERNALS
   // Maps references to UI 64x32
   ui: uiMap,
@@ -37,22 +38,22 @@ type variables = KK(int) | N(int) | NNN(int) | X(int) | Y(int)
 
 let getVariable = opcode =>
   switch opcode {
-  | X(code) => code->Pervasives.land(0x0f00)->Pervasives.lsr(8)
-  | Y(code) => code->Pervasives.land(0x00f0)->Pervasives.lsr(4)
-  | NNN(code) => code->Pervasives.land(0xfff)
-  | KK(code) => code->Pervasives.land(0x00ff)
-  | N(code) => code->Pervasives.land(0x000f)
+  | X(code) => code->land(0x0f00)->lsr(8)
+  | Y(code) => code->land(0x00f0)->lsr(4)
+  | NNN(code) => code->land(0xfff)
+  | KK(code) => code->land(0x00ff)
+  | N(code) => code->land(0x000f)
   }
 
 let getEmpty = {
-  memory: Js_typed_array.Uint8Array.fromLength(4096),
-  v: Js_typed_array.Uint8Array.fromLength(16),
+  memory: Uint8Array.fromLength(4096),
+  v: Uint8Array.fromLength(16),
   i: 0,
   dt: 0,
   st: 0,
   pc: memory_offset,
   sp: 0,
-  stack: Js_typed_array.Uint16Array.fromLength(16),
+  stack: Uint16Array.fromLength(16),
   ui: Belt.Array.make(32, Belt.Array.make(64, 0)),
   key: -1,
   halted: false,
@@ -60,7 +61,7 @@ let getEmpty = {
 
 type key = Number(int) | A | B | C | D | E | F
 
-let fontSet = Js_typed_array.Uint8Array.make([
+let fontSet = Uint8Array.make([
   0xF0,
   0x90,
   0x90,
@@ -145,12 +146,8 @@ let fontSet = Js_typed_array.Uint8Array.make([
 
 let loadFontSet = cpu => {
   let {memory} = cpu
-  for i in 0 to Js_typed_array.Uint8Array.length(fontSet) {
-    Js_typed_array.Uint8Array.unsafe_set(
-      memory,
-      i,
-      Js_typed_array.Uint8Array.unsafe_get(fontSet, i),
-    )
+  for i in 0 to Uint8Array.length(fontSet) {
+    Uint8Array.unsafe_set(memory, i, Uint8Array.unsafe_get(fontSet, i))
   }
   {...cpu, memory: memory}
 }
@@ -161,11 +158,7 @@ let loadRom = romBuffer => {
   | Some(rom) => {
       let {memory} = getEmpty
       for i in 0 to Js.Array.length(rom) - 1 {
-        Js_typed_array.Uint8Array.unsafe_set(
-          memory,
-          memory_offset + i,
-          int_of_string("0x" ++ rom[i]),
-        )
+        Uint8Array.unsafe_set(memory, memory_offset + i, int_of_string("0x" ++ rom[i]))
       }
 
       {
@@ -182,20 +175,71 @@ let loadRom = romBuffer => {
 // Return Opcode
 let fetch = cpu => {
   let {pc, memory} = cpu
-  let codes = [
-    Js_typed_array.Uint8Array.unsafe_get(memory, pc),
-    Js_typed_array.Uint8Array.unsafe_get(memory, pc + 1),
-  ]
-  ({...cpu, pc: pc + 2}, Pervasives.lsl(codes[0], 8) + codes[1])
+  let codes = [Uint8Array.unsafe_get(memory, pc), Uint8Array.unsafe_get(memory, pc + 1)]
+  ({...cpu, pc: pc + 2}, lsl(codes[0], 8) + codes[1])
 }
-let decode = (cpu, opcode) => (cpu, opcode)
-// // let a = Instruction.find(opcode)
-// Js.log(a)
-// (cpu, a)
 
-// let execute = (cpu, instructions) => instructions(cpu)
+let decode = opcode => opcode->Instruction.get
 
-let setV = (cpu, value) => {
-  Js.log(value)
-  cpu
-}
+open Instruction
+let execute = (cpu, (opcode, instruction)) =>
+  switch instruction {
+  | CLS => {...cpu, ui: Belt.Array.make(32, Belt.Array.make(64, 0))}
+  | RET => {...cpu, pc: Uint16Array.unsafe_get(cpu.stack, cpu.sp), sp: cpu.sp - 1}
+  | JP_addr => {...cpu, pc: opcode->NNN->getVariable}
+  | CALL_addr => {
+      let sp = cpu.sp + 1
+      Uint16Array.unsafe_set(cpu.stack, sp, cpu.pc)
+      {...cpu, sp: sp, pc: opcode->NNN->getVariable}
+    }
+  | SE_Vx_byte =>
+    Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable) === opcode->KK->getVariable
+      ? {...cpu, pc: cpu.pc + 2}
+      : cpu
+  | SNE_Vx_byte =>
+    Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable) !== opcode->KK->getVariable
+      ? {...cpu, pc: cpu.pc + 2}
+      : cpu
+  | SE_Vx_Vy =>
+    Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable) ===
+      Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable)
+      ? {...cpu, pc: cpu.pc + 2}
+      : cpu
+  | LD_Vx_byte => {
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, opcode->KK->getVariable)
+      cpu
+    }
+  | ADD_Vx_byte => {
+      let vx = Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, vx + opcode->KK->getVariable)
+      cpu
+    }
+  | LD_Vx_Vy => {
+      let vy = Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable)
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, vy)
+      cpu
+    }
+  | OR_Vx_Vy => {
+      let _or = lor(
+        Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable),
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable),
+      )
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, _or)
+      cpu
+    }
+  | AND_Vx_Vy => {
+      let _and = land(
+        Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable),
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable),
+      )
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, _and)
+      cpu
+    }
+
+  | _ => raise(Not_found)
+  }
+
+// let setV = (cpu, value) => {
+//   Js.log(value)
+//   cpu
+// }

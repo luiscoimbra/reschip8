@@ -3,46 +3,21 @@
 
 var CPU = require("./CPU.bs.js");
 var RomLoader = require("./RomLoader.bs.js");
-var Instruction = require("./Instruction.bs.js");
 var CamlinternalLazy = require("bs-platform/lib/js/camlinternalLazy.js");
 
 var rom = CamlinternalLazy.force(RomLoader.load);
 
 var match = CPU.$$fetch(CPU.loadRom(RomLoader.toBuffer(rom)));
 
-console.log(Instruction.find(24832));
-
-var a = Instruction.find(24576);
-
-var b;
-
-if (a !== undefined) {
-  var match$1 = a.t;
-  if (match$1 !== 8) {
-    throw {
-          RE_EXN_ID: "Match_failure",
-          _1: [
-            "Reschip8.res",
-            13,
-            2
-          ],
-          Error: new Error()
-        };
-  }
-  b = "is load vx";
-} else {
-  b = "Instruction not found";
-}
-
-console.log(b);
+var code = match[1];
 
 var cpu = match[0];
 
-var code = match[1];
+console.log(code);
+
+console.log(CPU.execute(cpu, CPU.decode(238)));
 
 exports.rom = rom;
 exports.cpu = cpu;
 exports.code = code;
-exports.a = a;
-exports.b = b;
 /* rom Not a pure module */
