@@ -1,5 +1,5 @@
 let load = lazy {
-  Js.log("reading dir")
+  Js.log("Reading ROM from disk")
   Node.Fs.readFileSync("./roms/MAZE", #hex)
 }
 

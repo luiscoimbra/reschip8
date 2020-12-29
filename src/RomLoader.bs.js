@@ -7,7 +7,7 @@ var Caml_option = require("bs-platform/lib/js/caml_option.js");
 var load = {
   LAZY_DONE: false,
   VAL: (function () {
-      console.log("reading dir");
+      console.log("Reading ROM from disk");
       return Fs.readFileSync("./roms/MAZE", "hex");
     })
 };

@@ -5,6 +5,15 @@ type address = int
 type uiMap = array<array<int>>
 
 let memory_offset = 0x200
+let fps = 15 //ms
+
+type dimension = {width: int, height: int}
+let uiDimension = {
+  width: 64,
+  height: 32,
+}
+
+type keyStatus = Up | Down
 
 type t = {
   // Chip8 is capable of access up to 4kb of memory
@@ -31,7 +40,7 @@ type t = {
   // Maps references to UI 64x32
   ui: uiMap,
   // Maps key current state
-  key: int,
+  keys: array<keyStatus>,
   halted: bool,
 }
 
@@ -56,105 +65,26 @@ let getEmpty = {
   sp: 0,
   stack: Uint16Array.fromLength(16),
   ui: Belt.Array.make(32, Belt.Array.make(64, 0)),
-  key: -1,
+  keys: Belt.Array.make(16, Down),
   halted: false,
 }
 
 type key = Number(int) | A | B | C | D | E | F
 
-let fontSet = Uint8Array.make([
-  0xF0,
-  0x90,
-  0x90,
-  0x90,
-  0xF0, // 0
-  0x20,
-  0x60,
-  0x20,
-  0x20,
-  0x70, // 1
-  0xF0,
-  0x10,
-  0xF0,
-  0x80,
-  0xF0, // 2
-  0xF0,
-  0x10,
-  0xF0,
-  0x10,
-  0xF0, // 3
-  0x90,
-  0x90,
-  0xF0,
-  0x10,
-  0x10, // 4
-  0xF0,
-  0x80,
-  0xF0,
-  0x10,
-  0xF0, // 5
-  0xF0,
-  0x80,
-  0xF0,
-  0x90,
-  0xF0, // 6
-  0xF0,
-  0x10,
-  0x20,
-  0x40,
-  0x40, // 7
-  0xF0,
-  0x90,
-  0xF0,
-  0x90,
-  0xF0, // 8
-  0xF0,
-  0x90,
-  0xF0,
-  0x10,
-  0xF0, // 9
-  0xF0,
-  0x90,
-  0xF0,
-  0x90,
-  0x90, // A
-  0xE0,
-  0x90,
-  0xE0,
-  0x90,
-  0xE0, // B
-  0xF0,
-  0x80,
-  0x80,
-  0x80,
-  0xF0, // C
-  0xE0,
-  0x90,
-  0x90,
-  0x90,
-  0xE0, // D
-  0xF0,
-  0x80,
-  0xF0,
-  0x80,
-  0xF0, // E
-  0xF0,
-  0x80,
-  0xF0,
-  0x80,
-  0x80, // F])
-])
-
 let loadFontSet = cpu => {
+  Js.log("Loading fontset")
   let {memory} = cpu
-  for i in 0 to Uint8Array.length(fontSet) {
-    Uint8Array.unsafe_set(memory, i, Uint8Array.unsafe_get(fontSet, i))
+  for i in 0 to Uint8Array.length(Fontset.get) {
+    Uint8Array.unsafe_set(memory, i, Uint8Array.unsafe_get(Fontset.get, i))
   }
   {...cpu, memory: memory}
 }
 
+exception Rom_not_found
+
 // We will have a CPU with rom data fully stored
 let loadRom = romBuffer => {
+  Js.log("Adding rom to memory")
   switch romBuffer {
   | Some(rom) => {
       let {memory} = getEmpty
@@ -167,7 +97,7 @@ let loadRom = romBuffer => {
         memory: memory,
       }
     }
-  | None => getEmpty
+  | None => raise(Rom_not_found)
   }
 }
 
@@ -299,5 +229,82 @@ let execute = (cpu, (opcode, instruction)) =>
       land(Js.Math.random_int(0, 0xff), opcode->KK->getVariable),
     )
     cpu
-  // | _ => raise(Not_found)
+  | DRW_Vx_Vy_n => {
+      let (x, y, n) = (
+        Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable),
+        Uint8Array.unsafe_get(cpu.v, opcode->Y->getVariable),
+        opcode->N->getVariable,
+      )
+      Uint8Array.unsafe_set(cpu.v, 0xf, 0)
+      for spriteX in 0 to n {
+        let spriteRow = Uint8Array.unsafe_get(cpu.memory, cpu.i + spriteX)
+        for bit in 0 to 7 {
+          let pixel = lsr(land(spriteRow, lsl(1, 7 - bit)), 7 - bit)
+          let (w, h) = (mod(x + bit, 64), mod(y + spriteX, 32))
+          if land(cpu.ui[h][w], pixel) === 1 {
+            Uint8Array.unsafe_set(cpu.v, 0xf, 1)
+          }
+          cpu.ui[h][w] = lxor(cpu.ui[h][w], pixel)
+        }
+      }
+      cpu
+    }
+  | SKP_Vx => {
+      let x = Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)
+      switch cpu.keys[x] {
+      | Down => {...cpu, pc: cpu.pc + 2}
+      | Up => cpu
+      }
+    }
+  | SKNP_Vx => {
+      let x = Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)
+      switch cpu.keys[x] {
+      | Up => {...cpu, pc: cpu.pc + 2}
+      | Down => cpu
+      }
+    }
+  | LD_Vx_DT => {
+      Uint8Array.unsafe_set(cpu.v, opcode->X->getVariable, cpu.dt)
+      cpu
+    }
+  | LD_Vx_K => {...cpu, halted: true}
+  | LD_DT_Vx => {...cpu, dt: Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)}
+  | LD_ST_Vx => {...cpu, st: Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)}
+  | ADD_I_Vx => {...cpu, i: cpu.i + Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)}
+  | LD_F_Vx => {...cpu, i: Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable) * 5}
+  | LD_B_Vx => {
+      let x = Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable)
+      let (hundreds, tens, ones) = (mod(x / 100, 10) * 100, mod(x / 10, 10) * 10, mod(x / 1, 10))
+      Uint8Array.unsafe_set(cpu.v, cpu.i, hundreds)
+      Uint8Array.unsafe_set(cpu.v, cpu.i + 1, tens)
+      Uint8Array.unsafe_set(cpu.v, cpu.i + 2, ones)
+      cpu
+    }
+  | LD_I_Vx => {
+      for v in 0 to Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable) {
+        Uint8Array.unsafe_set(cpu.memory, cpu.i + v, Uint8Array.unsafe_get(cpu.v, v))
+      }
+      cpu
+    }
+  | LD_Vx_I => {
+      for v in 0 to Uint8Array.unsafe_get(cpu.v, opcode->X->getVariable) {
+        Uint8Array.unsafe_set(cpu.v, v, Uint8Array.unsafe_get(cpu.memory, cpu.i + v))
+      }
+      cpu
+    }
   }
+
+let rec cycle = cpu => {
+  let (cpu, opcode) = cpu->fetch
+  let decoded = opcode->decode
+  let cpu = cpu->execute(decoded)
+
+  ConsoleInterface.draw(cpu.ui)
+  let _ = Js.Global.setTimeout(() => cycle(cpu), fps)
+}
+
+let init = rom => {
+  Js.log("Starting CPU")
+  ConsoleInterface.init()
+  rom->loadRom->loadFontSet->cycle
+}

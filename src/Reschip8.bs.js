@@ -5,19 +5,9 @@ var CPU = require("./CPU.bs.js");
 var RomLoader = require("./RomLoader.bs.js");
 var CamlinternalLazy = require("bs-platform/lib/js/camlinternalLazy.js");
 
-var rom = CamlinternalLazy.force(RomLoader.load);
+var rom = RomLoader.toBuffer(CamlinternalLazy.force(RomLoader.load));
 
-var match = CPU.$$fetch(CPU.loadRom(RomLoader.toBuffer(rom)));
-
-var code = match[1];
-
-var cpu = match[0];
-
-console.log(code);
-
-console.log(CPU.execute(cpu, CPU.decode(238)));
+CPU.init(rom);
 
 exports.rom = rom;
-exports.cpu = cpu;
-exports.code = code;
 /* rom Not a pure module */
