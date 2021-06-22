@@ -296,15 +296,20 @@ let execute = (cpu, (opcode, instruction)) =>
 
 let rec cycle = cpu => {
   let (cpu, opcode) = cpu->fetch
+  // opcode->Js.Int.toStringWithRadix(~radix=16)->Js.log
   let decoded = opcode->decode
+
+  
   let cpu = cpu->execute(decoded)
 
-  ConsoleInterface.draw(cpu.ui)
-  let _ = Js.Global.setTimeout(() => cycle(cpu), fps)
+  // ConsoleInterface.draw(cpu.ui)
+  // Js.log(decoded)
+  let _ = Js.Global.setTimeout(() => cycle(cpu), 200)
 }
 
 let init = rom => {
   Js.log("Starting CPU")
-  ConsoleInterface.init()
+  // rom->Js.log
+  // ConsoleInterface.init()
   rom->loadRom->loadFontSet->cycle
 }

@@ -24,11 +24,11 @@ let draw = ui => {
   for y in 0 to 31 {
     for x in 0 to 63 {
       if ui[y][x] === 1 {
-        screen.fillRegion(. ~color="5", ~chr=" ", x, x+ 2, y, y + 1)
+        screen.fillRegion(. ~color="15", ~chr=" ", x, x + 1, y, y + 1)
       } else {
-        screen.fillRegion(. ~color="2", ~chr=" ", x, x + 32, y, y + 1)
+        screen.fillRegion(. ~color="0", ~chr=" ", x, x + 1, y, y + 1)
       }
+      screen.render(.)
     }
   }
-  screen.render(.)
 }

@@ -16,13 +16,14 @@ function draw(ui) {
   for(var y = 0; y <= 31; ++y){
     for(var x = 0; x <= 63; ++x){
       if (Caml_array.get(Caml_array.get(ui, y), x) === 1) {
-        screen.fillRegion("5", " ", x, x + 2 | 0, y, y + 1 | 0);
+        screen.fillRegion("15", " ", x, x + 1 | 0, y, y + 1 | 0);
       } else {
-        screen.fillRegion("2", " ", x, x + 32 | 0, y, y + 1 | 0);
+        screen.fillRegion("0", " ", x, x + 1 | 0, y, y + 1 | 0);
       }
+      screen.render();
     }
   }
-  return screen.render();
+  
 }
 
 exports.screen = screen;

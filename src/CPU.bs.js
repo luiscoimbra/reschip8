@@ -8,7 +8,6 @@ var Caml_array = require("bs-platform/lib/js/caml_array.js");
 var Caml_format = require("bs-platform/lib/js/caml_format.js");
 var Instruction = require("./Instruction.bs.js");
 var Caml_exceptions = require("bs-platform/lib/js/caml_exceptions.js");
-var ConsoleInterface = require("./drivers/ConsoleInterface.bs.js");
 
 function getVariable(opcode) {
   switch (opcode.TAG | 0) {
@@ -664,16 +663,14 @@ function cycle(cpu) {
   var match = $$fetch(cpu);
   var decoded = Instruction.get(match[1]);
   var cpu$1 = execute(match[0], decoded);
-  ConsoleInterface.draw(cpu$1.ui);
   setTimeout((function (param) {
           return cycle(cpu$1);
-        }), 15);
+        }), 200);
   
 }
 
 function init(rom) {
   console.log("Starting CPU");
-  ConsoleInterface.init(undefined);
   return cycle(loadFontSet(loadRom(rom)));
 }
 

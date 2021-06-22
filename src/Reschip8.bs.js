@@ -7,6 +7,10 @@ var CamlinternalLazy = require("bs-platform/lib/js/camlinternalLazy.js");
 
 var rom = RomLoader.toBuffer(CamlinternalLazy.force(RomLoader.load));
 
+console.log(rom);
+
+console.log("cool ha");
+
 CPU.init(rom);
 
 exports.rom = rom;
